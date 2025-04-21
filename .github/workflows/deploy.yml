@@ -48,67 +48,68 @@ jobs:
           name: app-build
           path: ${{github.workspace}}/publish
 
-  deploy-infrastructure:
-    needs: build
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' # Add condition to only run on push to main or manual dispatch
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    outputs:
-      webAppName: ${{ steps.webapp.outputs.WEBAPP_NAME }}
-      keyVaultName: ${{ steps.deploy.outputs.keyVaultName }}
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          
-      - name: Create Resource Group if not exists
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az group create --name rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --location westeurope --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-            
-      - name: Deploy Bicep Infrastructure
-        id: deploy
-        uses: azure/arm-deploy@v2
-        with:
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          scope: resourcegroup
-          resourceGroupName: rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }}
-          template: ./Infrastructure/main.bicep
-          parameters: >
-            environmentName=${{ github.event.inputs.environment || 'dev' }}
-          deploymentName: 'eventgrid-${{ github.run_number }}'
-          failOnStdErr: false
-          
-      - name: Update Key Vault Secrets
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            # Update Key Vault with actual secret values from GitHub secrets
-            # Note: Ensure the keyVaultName output is correctly referenced from the deployment step
-            keyVaultName=$(az deployment group show --resource-group rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --name 'eventgrid-${{ github.run_number }}' --query properties.outputs.keyVaultName.value -o tsv)
-            az keyvault secret set --vault-name $keyVaultName --name "AuthorityUrl" --value "${{ secrets.AUTHORITY_URL }}"
-            az keyvault secret set --vault-name $keyVaultName --name "AudienceUrl" --value "${{ secrets.AUDIENCE_URL }}"
-            az keyvault secret set --vault-name $keyVaultName --name "ClientId" --value "${{ secrets.CLIENT_ID }}"
-            az keyvault secret set --vault-name $keyVaultName --name "ClientSecret" --value "${{ secrets.CLIENT_SECRET }}"
-            az keyvault secret set --vault-name $keyVaultName --name "EventGridValidationKey" --value "${{ secrets.EVENT_GRID_VALIDATION_KEY }}"
-            
-      - name: Set Web App Outputs
-        id: webapp
-        run: |
-          # Note: Ensure the webAppName output is correctly referenced from the deployment step
-          webAppName=$(az deployment group show --resource-group rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --name 'eventgrid-${{ github.run_number }}' --query properties.outputs.webAppName.value -o tsv)
-          echo "WEBAPP_NAME=$webAppName" >> $GITHUB_OUTPUT
+  # Infrastructure deployment is commented out as requested
+  #deploy-infrastructure:
+  #  needs: build
+  #  if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+  #  runs-on: ubuntu-latest
+  #  environment: ${{ github.event.inputs.environment || 'dev' }}
+  #  outputs:
+  #    webAppName: ${{ steps.webapp.outputs.WEBAPP_NAME }}
+  #    keyVaultName: ${{ steps.deploy.outputs.keyVaultName }}
+  #  
+  #  steps:
+  #    - uses: actions/checkout@v4
+  #    
+  #    - name: Azure Login
+  #      uses: azure/login@v2
+  #      with:
+  #        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+  #        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+  #        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  #        
+  #    - name: Create Resource Group if not exists
+  #      uses: azure/CLI@v2
+  #      with:
+  #        inlineScript: |
+  #          az group create --name rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --location westeurope --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  #          
+  #    - name: Deploy Bicep Infrastructure
+  #      id: deploy
+  #      uses: azure/arm-deploy@v2
+  #      with:
+  #        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  #        scope: resourcegroup
+  #        resourceGroupName: rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }}
+  #        template: ./Infrastructure/main.bicep
+  #        parameters: >
+  #          environmentName=${{ github.event.inputs.environment || 'dev' }}
+  #        deploymentName: 'eventgrid-${{ github.run_number }}'
+  #        failOnStdErr: false
+  #        
+  #    - name: Update Key Vault Secrets
+  #      uses: azure/CLI@v2
+  #      with:
+  #        inlineScript: |
+  #          # Update Key Vault with actual secret values from GitHub secrets
+  #          # Note: Ensure the keyVaultName output is correctly referenced from the deployment step
+  #          keyVaultName=$(az deployment group show --resource-group rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --name 'eventgrid-${{ github.run_number }}' --query properties.outputs.keyVaultName.value -o tsv)
+  #          az keyvault secret set --vault-name $keyVaultName --name "AuthorityUrl" --value "${{ secrets.AUTHORITY_URL }}"
+  #          az keyvault secret set --vault-name $keyVaultName --name "AudienceUrl" --value "${{ secrets.AUDIENCE_URL }}"
+  #          az keyvault secret set --vault-name $keyVaultName --name "ClientId" --value "${{ secrets.CLIENT_ID }}"
+  #          az keyvault secret set --vault-name $keyVaultName --name "ClientSecret" --value "${{ secrets.CLIENT_SECRET }}"
+  #          az keyvault secret set --vault-name $keyVaultName --name "EventGridValidationKey" --value "${{ secrets.EVENT_GRID_VALIDATION_KEY }}"
+  #          
+  #    - name: Set Web App Outputs
+  #      id: webapp
+  #      run: |
+  #        # Note: Ensure the webAppName output is correctly referenced from the deployment step
+  #        webAppName=$(az deployment group show --resource-group rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --name 'eventgrid-${{ github.run_number }}' --query properties.outputs.webAppName.value -o tsv)
+  #        echo "WEBAPP_NAME=$webAppName" >> $GITHUB_OUTPUT
 
   deploy-application:
-    needs: [build, deploy-infrastructure]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' # Add condition to only run on push to main or manual dispatch
+    needs: [build] # Removed dependency on deploy-infrastructure
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
     
@@ -129,5 +130,5 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ needs.deploy-infrastructure.outputs.webAppName }}
+          app-name: eventgriddev-app
           package: ${{github.workspace}}/publish
