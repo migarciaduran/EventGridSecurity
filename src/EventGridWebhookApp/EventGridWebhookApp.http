@@ -1,6 +1,76 @@
 @EventGridWebhookApp_HostAddress = http://localhost:5247
+@AzureWebAppUrl = https://eventgriddev-app.azurewebsites.net
 
+# Local testing - Weather endpoint
 GET {{EventGridWebhookApp_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+# Local testing - EventGrid endpoint with validation event
+POST {{EventGridWebhookApp_HostAddress}}/api/standardeventgrid/
+Content-Type: application/json
+Authorization: Bearer {{your_token}}
+aeg-signature: {{signature_value}}
+
+[
+  {
+    "id": "2d1781af-3a4c-4d7c-bd0c-e34b19da4e66",
+    "topic": "/subscriptions/example-subscription-id/resourcegroups/example-resourcegroup/providers/Microsoft.EventGrid/topics/example-topic",
+    "subject": "example-subject",
+    "eventType": "Microsoft.EventGrid.SubscriptionValidationEvent",
+    "data": {
+      "validationCode": "validation-code-example"
+    },
+    "dataVersion": "1.0",
+    "metadataVersion": "1",
+    "eventTime": "2023-04-21T12:00:00Z"
+  }
+]
+
+###
+
+# Local testing - EventGrid endpoint with custom event
+POST {{EventGridWebhookApp_HostAddress}}/api/standardeventgrid/
+Content-Type: application/json
+Authorization: Bearer {{your_token}}
+aeg-signature: {{signature_value}}
+
+[
+  {
+    "id": "3d1781af-3a4c-4d7c-bd0c-e34b19da4e67",
+    "topic": "/subscriptions/example-subscription-id/resourcegroups/example-resourcegroup/providers/Microsoft.EventGrid/topics/example-topic",
+    "subject": "example-subject",
+    "eventType": "ExampleEventType",
+    "data": {
+      "key1": "value1",
+      "key2": "value2"
+    },
+    "dataVersion": "1.0",
+    "metadataVersion": "1",
+    "eventTime": "2023-04-21T12:00:00Z"
+  }
+]
+
+###
+
+# Azure deployed app - EventGrid endpoint with validation event
+POST {{AzureWebAppUrl}}/api/standardeventgrid/
+Content-Type: application/json
+Authorization: Bearer {{your_token}}
+aeg-signature: {{signature_value}}
+
+[
+  {
+    "id": "2d1781af-3a4c-4d7c-bd0c-e34b19da4e66",
+    "topic": "/subscriptions/example-subscription-id/resourcegroups/example-resourcegroup/providers/Microsoft.EventGrid/topics/example-topic",
+    "subject": "example-subject",
+    "eventType": "Microsoft.EventGrid.SubscriptionValidationEvent",
+    "data": {
+      "validationCode": "validation-code-example"
+    },
+    "dataVersion": "1.0",
+    "metadataVersion": "1",
+    "eventTime": "2023-04-21T12:00:00Z"
+  }
+]

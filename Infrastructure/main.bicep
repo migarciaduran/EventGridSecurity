@@ -8,6 +8,9 @@ param location string = resourceGroup().location
 @description('The name prefix for all resources')
 param resourceNamePrefix string = ''
 
+@description('Whether to create role assignments (requires elevated permissions)')
+param createRoleAssignments bool = false
+
 // Set a local value for the prefix, ensuring it's never empty
 var actualResourcePrefix = empty(resourceNamePrefix) ? 'eventgrid${environmentName}' : resourceNamePrefix
 
@@ -74,6 +77,7 @@ module eventGridTopic 'modules/event-grid-topic.bicep' = {
     location: location
     webAppEndpoint: 'https://${webApp.outputs.webAppHostName}/api/standardeventgrid'
     webAppId: webApp.outputs.webAppId
+    createRoleAssignments: createRoleAssignments
   }
 }
 

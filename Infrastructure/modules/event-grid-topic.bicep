@@ -10,6 +10,9 @@ param webAppEndpoint string
 @description('The WebApp resource ID')
 param webAppId string
 
+@description('Whether to create role assignments (requires elevated permissions)')
+param createRoleAssignments bool = false
+
 // Create the Event Grid Topic
 resource eventGridTopic 'Microsoft.EventGrid/topics@2023-06-01-preview' = {
   name: eventGridTopicName
@@ -62,7 +65,7 @@ resource eventGridDataSenderRole 'Microsoft.Authorization/roleDefinitions@2022-0
   name: 'd5a91429-5739-47e2-a06b-3470a27159e7' // This is the ID for the 'EventGrid Data Sender' role
 }
 
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments) {
   name: guid(eventGridTopic.id, webAppId, eventGridDataSenderRole.id)
   scope: eventGridTopic
   properties: {
