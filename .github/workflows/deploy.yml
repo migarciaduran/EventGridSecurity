@@ -74,16 +74,15 @@ jobs:
             az group create --name rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} --location westeurope --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
             
       - name: Deploy Bicep Infrastructure
-        id: deploy # Add an id to this step to reference its outputs
+        id: deploy
         uses: azure/arm-deploy@v2
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          scope: resourcegroup # This scope requires resourceGroupName
-          resourceGroupName: rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }} # Add this line
+          scope: resourcegroup
+          resourceGroupName: rg-eventgridsecurity-${{ github.event.inputs.environment || 'dev' }}
           template: ./Infrastructure/main.bicep
           parameters: >
             environmentName=${{ github.event.inputs.environment || 'dev' }}
-            # resourceNamePrefix is now derived within main.bicep based on environmentName
           deploymentName: 'eventgrid-${{ github.run_number }}'
           failOnStdErr: false
           
