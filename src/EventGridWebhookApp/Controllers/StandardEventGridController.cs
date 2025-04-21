@@ -197,7 +197,10 @@ public class StandardEventGridController : ControllerBase
             }
             else
             {
-                 _logger.LogWarning("Validation event structure invalid or validationCode property not found/not a string. Event Data: {EventData}", validationEvent?.Data.ToString());
+                 // --- Fix: Check if validationEvent or validationEvent.Data is null before accessing ToString() ---
+                 string eventDataString = validationEvent?.Data is JsonElement dataElement ? dataElement.ToString() : "null";
+                 _logger.LogWarning("Validation event structure invalid or validationCode property not found/not a string. Event Data: {EventData}", eventDataString);
+                 // --- End Fix ---
             }
 
 
