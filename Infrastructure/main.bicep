@@ -4,15 +4,19 @@ param environmentName string = 'dev'
 @description('The Azure region for all resources')
 param location string = resourceGroup().location
 
+// Updated to ensure the prefix always includes the environment name explicitly
 @description('The name prefix for all resources')
-param resourceNamePrefix string = 'eventgrid${environmentName}'
+param resourceNamePrefix string = ''
 
-// Variables for resource naming
-var appServicePlanName = '${resourceNamePrefix}-plan'
-var webAppName = '${resourceNamePrefix}-app'
-var appInsightsName = '${resourceNamePrefix}-insights'
-var keyVaultName = '${resourceNamePrefix}-kv'
-var eventGridTopicName = '${resourceNamePrefix}-topic'
+// Set a local value for the prefix, ensuring it's never empty
+var actualResourcePrefix = empty(resourceNamePrefix) ? 'eventgrid${environmentName}' : resourceNamePrefix
+
+// Variables for resource naming - use the actualResourcePrefix variable
+var appServicePlanName = '${actualResourcePrefix}-plan'
+var webAppName = '${actualResourcePrefix}-app'
+var appInsightsName = '${actualResourcePrefix}-insights'
+var keyVaultName = '${actualResourcePrefix}-kv'
+var eventGridTopicName = '${actualResourcePrefix}-topic'
 
 // App Service Plan
 module appServicePlan 'modules/app-service-plan.bicep' = {

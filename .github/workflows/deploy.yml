@@ -83,7 +83,7 @@ jobs:
           template: ./Infrastructure/main.bicep
           parameters: >
             environmentName=${{ github.event.inputs.environment || 'dev' }}
-            resourceNamePrefix=${{ secrets.RESOURCE_NAME_PREFIX }}
+            # resourceNamePrefix is now derived within main.bicep based on environmentName
           deploymentName: 'eventgrid-${{ github.run_number }}'
           failOnStdErr: false
           
