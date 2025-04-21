@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using System; // Added for ArgumentNullException
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
@@ -13,9 +14,18 @@ public static class SecurityExtensions
 {
     public static IServiceCollection AddSecurityServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // Get audience from configuration with null safety
-        string? audienceValue = configuration["Authentication:Authority"];
-        
+        string? authority = configuration["Authentication:Authority"];
+        string? audience = configuration["Authentication:Audience"];
+
+        if (string.IsNullOrEmpty(authority))
+        {
+            throw new ArgumentNullException(nameof(authority), "Authentication:Authority configuration is missing or empty.");
+        }
+        if (string.IsNullOrEmpty(audience))
+        {
+            throw new ArgumentNullException(nameof(audience), "Authentication:Audience configuration is missing or empty.");
+        }
+
         // Add authentication
         services.AddAuthentication(options => {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -23,92 +33,62 @@ public static class SecurityExtensions
             options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
         })
         .AddJwtBearer(options => {
-            // Configure authority (identity provider)
-            options.Authority = configuration["Authentication:Authority"];
-            options.Audience = configuration["Authentication:Audience"];
-            
+            options.Authority = authority; // Use variable
+
             // Use strict token validation parameters
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true, 
-                ValidateAudience = true,
+                ValidateIssuer = true,
+                ValidateAudience = true, // This handles audience validation
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 RequireExpirationTime = true,
                 RequireSignedTokens = true,
-                ClockSkew = TimeSpan.FromMinutes(5), // Reasonable tolerance for clock differences
-                
-                // Ensure the audience matches exactly what's expected
-                ValidAudience = configuration["Authentication:Audience"],
-                
-                // You can also specify valid issuers if you have multiple trusted identity providers
-                ValidIssuers = new[] { 
-                    configuration["Authentication:Authority"]?.TrimEnd('/') ?? string.Empty,
+                ClockSkew = TimeSpan.FromMinutes(5),
+
+                ValidAudience = audience, // Use variable
+
+                ValidIssuers = new[] {
+                    authority.TrimEnd('/'), // Use variable
                     // Add any additional trusted issuers from your 3PP provider if needed
                 }
             };
-            
+
             // Add event handlers for monitoring and diagnostic purposes
             options.Events = new JwtBearerEvents
             {
                 OnAuthenticationFailed = context =>
                 {
-                    // Fix: Get logger from services instead of using context.Logger
                     var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger<JwtBearerEvents>();
-                    
-                    context.Response.StatusCode = 401;
-                    logger.LogWarning("Authentication failed: {Message}", context.Exception.Message);
+
+                    // Log detailed error if available
+                    logger.LogWarning(context.Exception, "Authentication failed: {Message}", context.Exception?.Message ?? "No exception details");
+                    context.Response.StatusCode = 401; // Ensure status code is set
                     return Task.CompletedTask;
                 },
                 OnForbidden = context =>
                 {
-                    // Fix: Get logger from services instead of using context.Logger
                     var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger<JwtBearerEvents>();
-                    
+
                     logger.LogWarning("Access forbidden for user: {User}", context.Principal?.Identity?.Name ?? "unknown");
+                    // No need to set status code here, middleware handles it
                     return Task.CompletedTask;
                 },
                 OnTokenValidated = context =>
                 {
+                    // The core audience validation is handled by TokenValidationParameters.ValidateAudience = true
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<JwtBearerEvents>>();
                     var token = context.SecurityToken as JwtSecurityToken;
-                    
-                    // Additional audience validation with proper null handling
-                    string? configAudience = configuration["Authentication:Audience"];
-                    string? tokenAudience = token?.Audiences?.FirstOrDefault();
 
-                    // Handle cases where configuration or token audience might be null
-                    if (string.IsNullOrEmpty(configAudience))
-                    {
-                        logger.LogWarning("No audience configured in Authentication:Audience setting");
-                        // Decide if this should be a validation failure
-                        // context.Fail("No audience configured");
-                        // return Task.CompletedTask;
-                    }
-                    else if (string.IsNullOrEmpty(tokenAudience))
-                    {
-                        logger.LogWarning("Token contains no audience claim");
-                        context.Fail("Invalid token - no audience claim");
-                        return Task.CompletedTask;
-                    }
-                    else if (tokenAudience != configAudience)
-                    {
-                        logger.LogWarning("Token audience validation failed. Expected: {Expected}, Actual: {Actual}", 
-                            configAudience, tokenAudience);
-                        
-                        context.Fail("Invalid audience in token");
-                        return Task.CompletedTask;
-                    }
-                    
-                    logger.LogInformation("Token successfully validated for user {Subject} with audience {Audience}", 
-                        token?.Subject, tokenAudience);
-                    
+                    logger.LogInformation("Token successfully validated for user {Subject} with audience {Audience}",
+                        token?.Subject, token?.Audiences?.FirstOrDefault() ?? "N/A");
+
                     return Task.CompletedTask;
                 }
             };
-            
+
             // Save token in authentication properties for easy access
             options.SaveToken = true;
         });
@@ -117,18 +97,14 @@ public static class SecurityExtensions
         services.AddAuthorization(options => {
             options.AddPolicy("EventGridPolicy", policy => {
                 policy.RequireAuthenticatedUser();
-                
-                // Fix: Require specific audience claim with null safety
-                string? audienceSetting = configuration["Authentication:Audience"];
-                if (!string.IsNullOrEmpty(audienceSetting))
-                {
-                    policy.RequireClaim("aud", audienceSetting);
-                }
-                
+
+                // Require specific audience claim (already validated by JWT middleware, but good for policy clarity)
+                policy.RequireClaim("aud", audience); // Use variable
+
                 // Optional: If your 3PP provider includes specific scopes/permissions
                 // Uncomment to require specific scope/permission:
                 // policy.RequireClaim("scope", "eventgrid.events.write", "eventgrid.events.read");
-                
+
                 // Optional: Add role-based validation if your 3PP provider supports roles
                 // policy.RequireRole("EventGridPublisher");
             });
@@ -152,12 +128,14 @@ public static class SecurityExtensions
         {
             options.AddPolicy("EventGridCorsPolicy", policy =>
             {
+                // --- Improvement: More specific CORS policy ---
                 // Be specific with allowed origins in production
                 // Consider loading allowed origins from configuration
-                policy.WithOrigins("https://management.azure.com") // Keep this specific
-                      .AllowAnyMethod() // Or specify methods: .WithMethods("GET", "POST", "OPTIONS")
-                      .AllowAnyHeader() // Or specify headers: .WithHeaders("Content-Type", "Authorization")
-                      .AllowCredentials();
+                policy.WithOrigins("https://management.azure.com") // Keep this specific for Azure Portal Event Grid interactions
+                      .WithMethods("POST", "OPTIONS") // Event Grid typically uses POST for delivery, OPTIONS for preflight
+                      .WithHeaders("Content-Type", "Authorization", "aeg-event-type") // Common headers for webhooks + Event Grid specific header
+                      .AllowCredentials(); // If needed, otherwise remove
+                // --- End Improvement ---
                 // Consider adding a more restrictive policy for general use if needed
             });
         });
