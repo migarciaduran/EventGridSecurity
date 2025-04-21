@@ -2,6 +2,9 @@ using Azure.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Azure.Security.KeyVault.Secrets;
 using System;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Azure.Monitor.OpenTelemetry.Exporter;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +41,21 @@ builder.Services.AddSwaggerGen();
 
 // Add Application Insights for logging
 builder.Services.AddApplicationInsightsTelemetry();
+
+// Configure OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: builder.Environment.ApplicationName,
+            serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddAzureMonitorTraceExporter(options => 
+        {
+            // Optionally configure options - connection string will be picked up from ApplicationInsights settings
+            options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+        }));
 
 // Register EventValidationService
 builder.Services.AddScoped<EventGridWebhookApp.Services.IEventValidationService, EventGridWebhookApp.Services.EventValidationService>();
