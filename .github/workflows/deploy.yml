@@ -1,0 +1,118 @@
+name: Deploy EventGrid Webhook App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          
+      - name: Restore dependencies
+        run: dotnet restore EventGridWebhookApp/EventGridWebhookApp.csproj
+        
+      - name: Build
+        run: dotnet build EventGridWebhookApp/EventGridWebhookApp.csproj --configuration Release --no-restore
+        
+      - name: Publish
+        run: dotnet publish EventGridWebhookApp/EventGridWebhookApp.csproj -c Release -o ${{github.workspace}}/publish
+        
+      - name: Upload artifact for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: ${{github.workspace}}/publish
+
+  deploy-infrastructure:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      webAppName: ${{ steps.webapp.outputs.WEBAPP_NAME }}
+      keyVaultName: ${{ steps.deploy.outputs.keyVaultName }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          
+      - name: Deploy Azure Resources
+        uses: azure/arm-deploy@v2
+        id: deploy
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          template: ./Infrastructure/main.bicep
+          parameters: >
+            environmentName=${{ github.event.inputs.environment || 'dev' }}
+            resourceNamePrefix=${{ secrets.RESOURCE_NAME_PREFIX }}
+          deploymentName: 'eventgrid-${{ github.run_number }}'
+          failOnStdErr: false
+          
+      - name: Update Key Vault Secrets
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            # Update Key Vault with actual secret values from GitHub secrets
+            az keyvault secret set --vault-name ${{ steps.deploy.outputs.keyVaultName }} --name "AuthorityUrl" --value "${{ secrets.AUTHORITY_URL }}"
+            az keyvault secret set --vault-name ${{ steps.deploy.outputs.keyVaultName }} --name "AudienceUrl" --value "${{ secrets.AUDIENCE_URL }}"
+            az keyvault secret set --vault-name ${{ steps.deploy.outputs.keyVaultName }} --name "ClientId" --value "${{ secrets.CLIENT_ID }}"
+            az keyvault secret set --vault-name ${{ steps.deploy.outputs.keyVaultName }} --name "ClientSecret" --value "${{ secrets.CLIENT_SECRET }}"
+            az keyvault secret set --vault-name ${{ steps.deploy.outputs.keyVaultName }} --name "EventGridValidationKey" --value "${{ secrets.EVENT_GRID_VALIDATION_KEY }}"
+            
+      - name: Set Web App Outputs
+        id: webapp
+        run: |
+          echo "WEBAPP_NAME=${{ steps.deploy.outputs.webAppName }}" >> $GITHUB_OUTPUT
+
+  deploy-application:
+    needs: [build, deploy-infrastructure]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: ${{github.workspace}}/publish
+          
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ needs.deploy-infrastructure.outputs.webAppName }}
+          package: ${{github.workspace}}/publish
