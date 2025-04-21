@@ -9,24 +9,22 @@ public static class MiddlewareExtensions
         // Add global exception handling middleware early in the pipeline
         app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-        // Configure the HTTP request pipeline based on environment
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
+        app.UseSwagger();
+        app.UseSwaggerUI();
 
-            // Redirect root path requests to Swagger UI in Development
-            app.Use(async (context, next) =>
+        // Redirect root path requests to Swagger UI in Development
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path == "/")
             {
-                if (context.Request.Path == "/")
-                {
-                    context.Response.Redirect("/swagger");
-                    return; // Short-circuit the pipeline
-                }
-                await next(context); // Pass context explicitly
-            });
-        }
-        else
+                context.Response.Redirect("/swagger");
+                return; // Short-circuit the pipeline
+            }
+            await next(context); // Pass context explicitly
+        });
+        
+        // Configure the HTTP request pipeline based on environment
+        if (!app.Environment.IsDevelopment())
         {
             // Add security headers in production
             app.UseHsts(); // Enforces HTTPS
