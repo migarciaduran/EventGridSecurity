@@ -130,5 +130,5 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: eventgriddev-app
+          app-name: ${{ secrets.WEBAPP_NAME }} # Using a secret instead of output from infrastructure job
           package: ${{github.workspace}}/publish
