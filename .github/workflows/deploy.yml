@@ -132,3 +132,6 @@ jobs:
         with:
           app-name: ${{ secrets.WEBAPP_NAME }} # Using a secret instead of output from infrastructure job
           package: ${{github.workspace}}/publish
+          # Conditionally set the environment based on the target environment
+          app-settings: |
+            ASPNETCORE_ENVIRONMENT=${{ (github.event.inputs.environment || 'dev') == 'dev' && 'Development' || 'Production' }}

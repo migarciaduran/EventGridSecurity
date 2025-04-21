@@ -125,20 +125,42 @@ builder.Services.AddAuthorization(options => {
     });
 });
 
-// Add rate limiting
+// Configure rate limiting to prevent abuse and ensure fair usage
 builder.Services.AddRateLimiter(options => {
+    // Apply a fixed window rate limiter named "fixed"
     options.AddFixedWindowLimiter("fixed", options => {
-        options.PermitLimit = 100;
-        options.Window = TimeSpan.FromMinutes(1);
+        options.PermitLimit = 100; // Allow 100 requests per window
+        options.Window = TimeSpan.FromMinutes(1); // Window duration of 1 minute
     });
 });
 
-// Add CORS policy
-builder.Services.AddCors(options => {
-    options.AddPolicy("EventGridCorsPolicy", policy => {
+// Configure Cross-Origin Resource Sharing (CORS) to control which external websites can access the API.
+// CORS is a security mechanism that restricts cross-origin HTTP requests initiated from web browsers,
+// ensuring only trusted domains can interact with the API, preventing unauthorized access.
+builder.Services.AddCors(options =>
+{
+    // Define a named CORS policy called "EventGridCorsPolicy" to specify access rules.
+    // Policies allow reusable configurations that can be applied to specific API endpoints or globally.
+    options.AddPolicy("EventGridCorsPolicy", policy =>
+    {
+        // Restrict access to only the Azure Management portal (https://management.azure.com).
+        // This ensures that only requests originating from this trusted domain are allowed,
+        // blocking requests from other websites for security purposes.
         policy.WithOrigins("https://management.azure.com")
+
+              // Allow all HTTP methods (e.g., GET, POST, PUT, DELETE, PATCH) from the specified origin.
+              // This provides flexibility for the Azure Management portal to perform any type of operation,
+              // such as retrieving data, submitting updates, or deleting resources.
               .AllowAnyMethod()
+
+              // Permit any HTTP headers in requests from the allowed origin.
+              // Headers carry additional metadata (e.g., Content-Type, Authorization tokens),
+              // and allowing all headers ensures the Azure portal can include any necessary information.
               .AllowAnyHeader()
+
+              // Enable credentials (e.g., cookies, HTTP authentication, or client certificates) in requests.
+              // This is crucial for authenticated requests where the Azure portal needs to send session data
+              // or tokens to verify the user's identity, ensuring secure access to protected resources.
               .AllowCredentials();
     });
 });
@@ -153,6 +175,17 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Redirect root path requests to Swagger UI in Development
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path == "/")
+        {
+            context.Response.Redirect("/swagger");
+            return; // Short-circuit the pipeline
+        }
+        await next();
+    });
 }
 else
 {
