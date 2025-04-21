@@ -31,13 +31,16 @@ jobs:
           dotnet-version: '8.0.x'
           
       - name: Restore dependencies
-        run: dotnet restore EventGridWebhookApp/EventGridWebhookApp.csproj
+        run: dotnet restore ./EventGridSecurity.sln # Target solution file
         
       - name: Build
-        run: dotnet build EventGridWebhookApp/EventGridWebhookApp.csproj --configuration Release --no-restore
+        run: dotnet build ./EventGridSecurity.sln --configuration Release --no-restore # Target solution file
+
+      - name: Test
+        run: dotnet test ./EventGridSecurity.sln --configuration Release --no-build --verbosity normal # Add test step
         
       - name: Publish
-        run: dotnet publish EventGridWebhookApp/EventGridWebhookApp.csproj -c Release -o ${{github.workspace}}/publish
+        run: dotnet publish ./src/EventGridWebhookApp/EventGridWebhookApp.csproj -c Release -o ${{github.workspace}}/publish --no-build # Specify project, add --no-build
         
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
@@ -47,6 +50,7 @@ jobs:
 
   deploy-infrastructure:
     needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' # Add condition to only run on push to main or manual dispatch
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
     outputs:
@@ -94,6 +98,7 @@ jobs:
 
   deploy-application:
     needs: [build, deploy-infrastructure]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' # Add condition to only run on push to main or manual dispatch
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
     
