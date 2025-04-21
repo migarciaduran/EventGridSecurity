@@ -38,7 +38,7 @@ module webApp 'modules/web-app.bicep' = {
     location: location
     appServicePlanId: appServicePlan.outputs.appServicePlanId
     appInsightsConnectionString: appInsights.outputs.connectionString
-    keyVaultName: keyVault.outputs.keyVaultName
+    keyVaultName: keyVaultName // Pass the variable directly, not the output
     environmentName: environmentName
   }
 }
@@ -58,7 +58,7 @@ module keyVault 'modules/key-vault.bicep' = {
   params: {
     keyVaultName: keyVaultName
     location: location
-    webAppPrincipalId: webApp.outputs.principalId
+    webAppPrincipalId: webApp.outputs.principalId // This dependency is now okay
   }
 }
 

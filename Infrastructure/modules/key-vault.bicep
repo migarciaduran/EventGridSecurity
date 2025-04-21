@@ -47,7 +47,7 @@ resource authorityUrlSecret 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = {
   parent: keyVault
   name: 'AuthorityUrl'
   properties: {
-    value: 'https://login.microsoftonline.com/YOUR_TENANT_ID/'
+    value: '${environment().authentication.loginEndpoint}${subscription().tenantId}/' // Use environment() function
   }
 }
 

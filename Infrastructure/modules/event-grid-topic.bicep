@@ -19,7 +19,7 @@ resource eventGridTopic 'Microsoft.EventGrid/topics@2023-06-01-preview' = {
     publicNetworkAccess: 'Enabled'
     dataResidencyBoundary: 'WithinGeopair'
     disableLocalAuth: true
-    minimumTlsVersionRequired: '1.2'
+    minimumTlsVersionAllowed: '1.2'
   }
 }
 
