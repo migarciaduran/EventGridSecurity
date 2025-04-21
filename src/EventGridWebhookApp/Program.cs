@@ -41,41 +41,57 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Application Insights for logging
-builder.Services.AddApplicationInsightsTelemetry();
+// Get the Application Insights connection string
+string? appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"] ?? 
+                                     Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
 
-// Configure logging to use Application Insights
-builder.Logging.AddApplicationInsights(
-    configureTelemetryConfiguration: (config) => 
-        config.ConnectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING") ?? 
-                                  builder.Configuration["ApplicationInsights:ConnectionString"],
-    configureApplicationInsightsLoggerOptions: (options) => { }
-);
-builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>("", LogLevel.Information);
+// Configure logging and Application Insights
+builder.Logging.ClearProviders(); // Clear default providers first
+
+if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+{
+    // Add Application Insights telemetry and logging
+    builder.Services.AddApplicationInsightsTelemetry(options => 
+    {
+        options.ConnectionString = appInsightsConnectionString;
+    });
+    // The AddApplicationInsightsTelemetry extension automatically registers the Application Insights logger provider.
+    // We can configure the minimum log level for Application Insights here if needed,
+    // otherwise it defaults based on appsettings.json or environment variables.
+    // Example: builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>(null, LogLevel.Information); 
+    
+    // Add console logging as well, useful for seeing logs locally even when AppInsights is configured.
+    builder.Logging.AddConsole(); 
+}
+else
+{
+    // Configure standard logging if Application Insights is not available
+    builder.Logging.AddConsole();
+    builder.Logging.AddDebug();
+
+    // Log a warning if in production and no connection string is available
+    if (!builder.Environment.IsDevelopment())
+    {
+        // Use a temporary logger factory to log the warning since logging isn't fully built yet
+        using var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
+        var logger = loggerFactory.CreateLogger<Program>();
+        logger.LogWarning("No Application Insights connection string found. Telemetry will not be collected.");
+    }
+}
 
 // Configure OpenTelemetry
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService(
-            serviceName: builder.Environment.ApplicationName,
-            serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddAzureMonitorTraceExporter(options => 
-        {
-            // Use the APPLICATIONINSIGHTS_CONNECTION_STRING environment variable if available
-            var connectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
-            if (!string.IsNullOrEmpty(connectionString))
-            {
-                options.ConnectionString = connectionString;
-            }
-            else
-            {
-                // Fall back to the configuration value if environment variable isn't set
-                options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
-            }
-        }));
+if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+{
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource
+            .AddService(
+                serviceName: builder.Environment.ApplicationName,
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddAzureMonitorTraceExporter(options => options.ConnectionString = appInsightsConnectionString));
+}
 
 // Register EventValidationService
 builder.Services.AddScoped<EventGridWebhookApp.Services.IEventValidationService, EventGridWebhookApp.Services.EventValidationService>();
