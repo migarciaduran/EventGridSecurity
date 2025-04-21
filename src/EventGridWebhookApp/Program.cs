@@ -5,6 +5,8 @@ using System;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.ApplicationInsights;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +43,15 @@ builder.Services.AddSwaggerGen();
 
 // Add Application Insights for logging
 builder.Services.AddApplicationInsightsTelemetry();
+
+// Configure logging to use Application Insights
+builder.Logging.AddApplicationInsights(
+    configureTelemetryConfiguration: (config) => 
+        config.ConnectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING") ?? 
+                                  builder.Configuration["ApplicationInsights:ConnectionString"],
+    configureApplicationInsightsLoggerOptions: (options) => { }
+);
+builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>("", LogLevel.Information);
 
 // Configure OpenTelemetry
 builder.Services.AddOpenTelemetry()
