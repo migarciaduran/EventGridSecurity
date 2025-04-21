@@ -50,3 +50,6 @@ I want to create a .NET Core application with the following features:
 - Add telemetry to measure authentication performance and reliability
 - Create a simple UI to visualize authentication test results
 - Compare performance and reliability between standard EventGrid schema and CloudEvents v1.0 schema
+
+## Extra
+- https://learn.microsoft.com/en-us/azure/event-grid/secure-webhook-delivery#deliver-events-to-a-webhook-in-the-same-azure-ad-tenant
