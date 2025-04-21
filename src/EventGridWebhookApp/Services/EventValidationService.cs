@@ -33,7 +33,7 @@ namespace EventGridWebhookApp.Services
             try
             {
                 // Get the validation key from configuration (stored securely in Key Vault)
-                var validationKey = _configuration["EventGrid--ValidationKey"];
+                var validationKey = _configuration["EventGrid:ValidationKey"];
                 if (string.IsNullOrEmpty(validationKey))
                 {
                     _logger.LogWarning("EventGrid validation key is not configured");
@@ -68,7 +68,7 @@ namespace EventGridWebhookApp.Services
                 var allowedTopics = new List<string>();
                 
                 // Attempt to get at least one allowed topic (more can be added as needed)
-                var allowedTopic0 = _configuration["EventGrid--AllowedTopics--0"];
+                var allowedTopic0 = _configuration["EventGrid:AllowedTopics:0"];
                 if (!string.IsNullOrEmpty(allowedTopic0))
                 {
                     allowedTopics.Add(allowedTopic0);

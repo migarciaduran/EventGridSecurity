@@ -46,8 +46,8 @@ builder.Services.AddScoped<EventGridWebhookApp.Services.IEventValidationService,
 builder.Services.AddAuthentication()
     .AddJwtBearer(options => {
         // These will now be loaded from Key Vault in production
-        options.Authority = builder.Configuration["Authentication--Authority"];
-        options.Audience = builder.Configuration["Authentication--Audience"];
+        options.Authority = builder.Configuration["Authentication:Authority"];
+        options.Audience = builder.Configuration["Authentication:Audience"];
         
         // Add additional JWT bearer options
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters

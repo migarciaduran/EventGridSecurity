@@ -26,6 +26,21 @@ namespace EventGridWebhookApp.Controllers
             _validationService = validationService;
         }
 
+        [HttpGet("test")]
+        public IActionResult Test()
+        {
+            _logger.LogInformation("Test endpoint called at: {Time}", DateTime.UtcNow);
+            
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown";
+            _logger.LogInformation("Current environment: {Environment}", environment);
+            
+            return Ok(new { 
+                message = "EventGrid API is working correctly", 
+                timestamp = DateTime.UtcNow,
+                environment = environment
+            });
+        }
+
         [HttpPost]
         [Authorize(Policy = "EventGridPolicy")]
         public async Task<IActionResult> Post()
