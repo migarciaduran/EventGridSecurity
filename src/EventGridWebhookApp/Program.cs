@@ -39,6 +39,7 @@ if (!builder.Environment.IsDevelopment())
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks(); // Add Health Check services
 
 // Get the Application Insights connection string (still needed for exporters and SDK)
 string? appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"] ??
@@ -173,5 +174,8 @@ app.UseRateLimiter();
 
 // Map controllers
 app.MapControllers();
+
+// Map the health check endpoint
+app.MapHealthChecks("/healthz");
 
 app.Run();
