@@ -53,8 +53,17 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddAzureMonitorTraceExporter(options => 
         {
-            // Optionally configure options - connection string will be picked up from ApplicationInsights settings
-            options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+            // Use the APPLICATIONINSIGHTS_CONNECTION_STRING environment variable if available
+            var connectionString = Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                options.ConnectionString = connectionString;
+            }
+            else
+            {
+                // Fall back to the configuration value if environment variable isn't set
+                options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+            }
         }));
 
 // Register EventValidationService
