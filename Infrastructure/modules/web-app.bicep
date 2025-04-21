@@ -44,6 +44,10 @@ resource webApp 'Microsoft.Web/sites@2022-03-01' = {
           value: keyVaultName
         }
         {
+          name: 'ManagedIdentityClientId'
+          value: '' // Leave empty to use system-assigned managed identity
+        }
+        {
           name: 'Authentication--Authority'
           value: '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.vault.azure.net/secrets/AuthorityUrl/)'
         }

@@ -13,7 +13,13 @@ if (!builder.Environment.IsDevelopment())
     if (!string.IsNullOrEmpty(keyVaultName))
     {
         var keyVaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
-        var credential = new DefaultAzureCredential();
+        
+        // Use DefaultAzureCredential for RBAC-based access
+        var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions 
+        {
+            ManagedIdentityClientId = builder.Configuration["ManagedIdentityClientId"],
+            ExcludeSharedTokenCacheCredential = true
+        });
         
         // Register SecretClient for dependency injection
         builder.Services.AddSingleton(new SecretClient(keyVaultUri, credential));
@@ -24,7 +30,7 @@ if (!builder.Environment.IsDevelopment())
 }
 
 // Add services to the container.
-builder.Services.AddControllers(); // Add this line to register controllers
+builder.Services.AddControllers();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -34,7 +40,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApplicationInsightsTelemetry();
 
 // Register EventValidationService
-builder.Services.AddScoped<EventGridWebhookApp.Services.IEventValidationService, EventGridWebhookApp.Services.EventValidationService>(); // Use interface
+builder.Services.AddScoped<EventGridWebhookApp.Services.IEventValidationService, EventGridWebhookApp.Services.EventValidationService>();
 
 // Add authentication and authorization
 builder.Services.AddAuthentication()

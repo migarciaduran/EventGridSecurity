@@ -7,7 +7,7 @@ param location string
 @description('The principal ID of the Web App managed identity')
 param webAppPrincipalId string
 
-// Key Vault resource with access policies
+// Key Vault resource with RBAC authorization
 resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
   name: keyVaultName
   location: location
@@ -18,27 +18,26 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-07-01' = {
     tenantId: subscription().tenantId
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    enableRbacAuthorization: false
+    enableRbacAuthorization: true
     sku: {
       family: 'A'
       name: 'standard'
     }
-    accessPolicies: [
-      {
-        tenantId: subscription().tenantId
-        objectId: webAppPrincipalId
-        permissions: {
-          secrets: [
-            'get'
-            'list'
-          ]
-        }
-      }
-    ]
     networkAcls: {
       defaultAction: 'Allow'
       bypass: 'AzureServices'
     }
+  }
+}
+
+// Assign Key Vault Secrets User built-in role to the web app's managed identity
+resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, webAppPrincipalId, 'Key Vault Secrets User')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6') // Key Vault Secrets User role
+    principalId: webAppPrincipalId
+    principalType: 'ServicePrincipal'
   }
 }
 
