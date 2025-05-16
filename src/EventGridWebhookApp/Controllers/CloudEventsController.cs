@@ -1,8 +1,4 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using EventGridWebhookApp.Models;
 using EventGridWebhookApp.Services;
@@ -16,13 +12,16 @@ namespace EventGridWebhookApp.Controllers
     {
         private readonly ILogger<CloudEventsController> _logger;
         private readonly IEventValidationService _validationService; // Use interface
+        private readonly IAuthorizationService _authorizationService; // Add authorization service
 
         public CloudEventsController(
             ILogger<CloudEventsController> logger,
-            IEventValidationService validationService) // Inject interface
+            IEventValidationService validationService,
+            IAuthorizationService authorizationService) // Inject interface
         {
             _logger = logger;
             _validationService = validationService;
+            _authorizationService = authorizationService;
         }
 
         [HttpPost]
@@ -36,10 +35,10 @@ namespace EventGridWebhookApp.Controllers
                 // Read the request body
                 using var reader = new StreamReader(Request.Body);
                 var requestBody = await reader.ReadToEndAsync();
-                
+
                 // Parse the CloudEvent
                 var cloudEvent = JsonSerializer.Deserialize<CloudEvent>(requestBody);
-                
+
                 if (cloudEvent == null)
                 {
                     _logger.LogWarning("Failed to deserialize CloudEvent");
@@ -65,7 +64,7 @@ namespace EventGridWebhookApp.Controllers
 
                 // Process the event
                 _logger.LogInformation($"Processing CloudEvent: {cloudEvent.Id} of type {cloudEvent.Type}");
-                
+
                 // Add your event processing logic here
                 // ...
 
@@ -81,9 +80,29 @@ namespace EventGridWebhookApp.Controllers
         [HttpOptions]
         public IActionResult Options()
         {
-            // Handle OPTIONS requests for CloudEvents HTTP binding
-            Response.Headers["WebHook-Allowed-Origin"] = "*";
+            _logger.LogInformation("Received OPTIONS request for CloudEvents webhook validation");
+            
+            // Get Origin header to validate it comes from Azure EventGrid
+            if (!Request.Headers.TryGetValue("Origin", out var originValues) || originValues.Count == 0)
+            {
+                _logger.LogWarning("OPTIONS request missing Origin header");
+                return BadRequest("Missing Origin header");
+            }
+            
+            var origin = originValues.First();
+            if (!string.Equals(origin, "azure-eventing.net", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("OPTIONS request from unauthorized origin: {Origin}", origin);
+                return BadRequest("Unauthorized origin");
+            }
+            
+            // Origin validated successfully - proceed with the CloudEvents validation handshake
+            _logger.LogInformation("Valid origin confirmed: {Origin}", origin);
+            
+            // Set the proper response headers for the CloudEvents validation handshake
+            Response.Headers["WebHook-Allowed-Origin"] = "azure-eventing.net";
             Response.Headers["WebHook-Allowed-Rate"] = "120";
+            
             return Ok();
         }
     }

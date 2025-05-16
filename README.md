@@ -14,6 +14,22 @@ This is a secure .NET 8 web application that processes Azure EventGrid events us
 - Global exception handling
 - Secure secret management with Azure Key Vault
 
+## EventGrid Secure Webhook Delivery
+
+This application is configured to work with Azure EventGrid Secure Webhook Delivery using Microsoft Entra ID (Azure AD) authentication:
+
+1. The application validates tokens sent by Event Grid with:
+   - Verification of the issuer (Azure AD)
+   - Validation of the audience claim (your app's URI)
+   - Confirmation of the appid claim (Event Grid's app ID: 4962773b-9cdb-44cf-a8bf-237846a00ab7)
+   - Token expiration and signature validation
+
+2. To configure EventGrid to send authenticated requests:
+   - In the Azure portal, when creating your Event Subscription, go to "Additional Features"
+   - Enable "Use Microsoft Entra Authentication"
+   - Provide your Azure AD tenant ID and application ID or App ID URI
+   - Ensure Event Grid has been granted the "AzureEventGridSecureWebhookSubscriber" role on your application
+
 ## Prerequisites
 
 - .NET 8 SDK

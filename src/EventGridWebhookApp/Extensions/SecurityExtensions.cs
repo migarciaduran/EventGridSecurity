@@ -27,12 +27,14 @@ public static class SecurityExtensions
         }
 
         // Add authentication
-        services.AddAuthentication(options => {
+        services.AddAuthentication(options =>
+        {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
         })
-        .AddJwtBearer(options => {
+        .AddJwtBearer(options =>
+        {
             options.Authority = authority; // Use variable
 
             // Use strict token validation parameters
@@ -82,8 +84,21 @@ public static class SecurityExtensions
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<JwtBearerEvents>>();
                     var token = context.SecurityToken as JwtSecurityToken;
 
-                    logger.LogInformation("Token successfully validated for user {Subject} with audience {Audience}",
-                        token?.Subject, token?.Audiences?.FirstOrDefault() ?? "N/A");
+                    // Extract the appId claim - this should be Event Grid's application ID
+                    var appId = context.Principal?.FindFirstValue("appid");
+                    var isEventGridAppId = appId == "4962773b-9cdb-44cf-a8bf-237846a00ab7";
+
+                    if (isEventGridAppId)
+                    {
+                        logger.LogInformation("Token successfully validated from Azure EventGrid appId with audience {Audience}",
+                            token?.Audiences?.FirstOrDefault() ?? "N/A");
+                    }
+                    else
+                    {
+                        // Log a warning if the token is not from Event Grid but still valid
+                        logger.LogWarning("Token validated but from unexpected application: AppId={AppId}, Subject={Subject}",
+                            appId, token?.Subject);
+                    }
 
                     return Task.CompletedTask;
                 }
@@ -91,15 +106,21 @@ public static class SecurityExtensions
 
             // Save token in authentication properties for easy access
             options.SaveToken = true;
-        });
-
-        // Add authorization
-        services.AddAuthorization(options => {
-            options.AddPolicy("EventGridPolicy", policy => {
+        });        // Add authorization
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("EventGridPolicy", policy =>
+            {
                 policy.RequireAuthenticatedUser();
 
                 // Require specific audience claim (already validated by JWT middleware, but good for policy clarity)
                 policy.RequireClaim("aud", audience); // Use variable
+
+                // Add a check for the Azure EventGrid App ID
+                // Event Grid's app ID in Microsoft's tenant is always this value
+                policy.RequireClaim("appid", "4962773b-9cdb-44cf-a8bf-237846a00ab7"); // Azure Event Grid appId
+
+                
 
                 // Optional: If your 3PP provider includes specific scopes/permissions
                 // Uncomment to require specific scope/permission:
@@ -111,9 +132,11 @@ public static class SecurityExtensions
         });
 
         // Configure rate limiting
-        services.AddRateLimiter(options => {
+        services.AddRateLimiter(options =>
+        {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests; // Standard response code
-            options.AddFixedWindowLimiter("fixed", opt => {
+            options.AddFixedWindowLimiter("fixed", opt =>
+            {
                 opt.PermitLimit = 100;
                 opt.Window = TimeSpan.FromMinutes(1);
                 opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst; // Process requests FIFO
