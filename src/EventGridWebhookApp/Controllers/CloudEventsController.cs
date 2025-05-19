@@ -12,16 +12,13 @@ namespace EventGridWebhookApp.Controllers
     {
         private readonly ILogger<CloudEventsController> _logger;
         private readonly IEventValidationService _validationService; // Use interface
-        private readonly IAuthorizationService _authorizationService; // Add authorization service
 
         public CloudEventsController(
             ILogger<CloudEventsController> logger,
-            IEventValidationService validationService,
-            IAuthorizationService authorizationService) // Inject interface
+            IEventValidationService validationService)
         {
             _logger = logger;
             _validationService = validationService;
-            _authorizationService = authorizationService;
         }
 
         [HttpPost]
